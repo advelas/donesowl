@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ficha de personaje</title>
+<style>
+:root{
+  --bg:#1d1b22; --panel:#27242f; --line:#3a3644; --text:#ece8f2; --muted:#9b95a8;
+  --danger:#e5604d;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,"Segoe UI",sans-serif}
+body{padding:12px;display:flex;flex-direction:column;gap:10px}
+header{display:flex;gap:12px;align-items:center}
+#avatar{width:84px;height:84px;border-radius:14px;border:2px dashed var(--line);background:var(--panel) center/cover no-repeat;cursor:pointer;color:var(--muted);font-size:11px;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;flex:none}
+#avatar.has{border-style:solid}
+#name{flex:1;min-width:0;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);font:600 22px/1.2 Georgia,"Times New Roman",serif;padding:4px 0}
+#name:focus{outline:none;border-color:var(--text)}
+.stat{background:var(--panel);border-radius:10px;padding:10px;border-left:5px solid var(--c)}
+.stat.group-salud{background:#2b2229}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.top b{font-weight:600}
+.val{font-variant-numeric:tabular-nums;color:var(--muted)}
+.bar{position:relative;height:16px;background:#14121a;border-radius:8px;overflow:hidden;margin:6px 0 8px}
+.fill{height:100%;width:100%;background:var(--c);transition:width .25s}
+.tick{position:absolute;top:0;bottom:0;width:2px;background:var(--bg)}
+.pen{font-size:12px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--line);color:var(--muted)}
+.pen.on{background:var(--danger);color:#fff}
+.row{display:flex;gap:6px;align-items:center}
+.row input[type=number]{width:62px;background:#14121a;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 6px}
+button{background:var(--line);color:var(--text);border:0;border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
+button:hover{filter:brightness(1.2)}
+button:focus-visible,input:focus-visible{outline:2px solid #9ec5ff;outline-offset:1px}
+.dmg{background:var(--danger);color:#fff}
+.sp{flex:1}
+.cfg{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:12px}
+input[type=color]{width:24px;height:24px;border:0;padding:0;background:none;cursor:pointer}
+footer{display:flex;gap:6px;flex-wrap:wrap}
+footer button{flex:1}
+#msg{color:var(--muted);font-size:12px;min-height:16px}
+</style>
+</head>
+<body>
+<header>
+  <div id="avatar" title="Subir imagen" tabindex="0" role="button">Subir imagen</div>
+  <input id="name" placeholder="Nombre del personaje" maxlength="40" aria-label="Nombre del personaje">
+  <input id="file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+</header>
+
+<main id="stats" style="display:flex;flex-direction:column;gap:8px"></main>
+
+<footer>
+  <button id="export">Exportar JSON</button>
+  <button id="import">Importar JSON</button>
+  <button id="reset">Reiniciar</button>
+  <input id="jsonfile" type="file" accept="application/json,.json" hidden>
+</footer>
+<div id="msg" aria-live="polite"></div>
+
+<script type="module">
+const DEFAULT = () => ({
+  name: "",
+  img: "",
+  stats: {
+    resFis:  { label:"Resistencia física",     kind:"res",   max:10, cur:10, color:"#d98a3d" },
+    resEne:  { label:"Resistencia energética", kind:"res",   max:10, cur:10, color:"#4aa3df" },
+    resMen:  { label:"Resistencia mental",     kind:"res",   max:10, cur:10, color:"#9b7bd6" },
+    salud:   { label:"Salud",                  kind:"salud", max:10, cur:10, color:"#d9534f" },
+    saludMen:{ label:"Salud mental",           kind:"salud", max:10, cur:10, color:"#c0508f" },
+  }
+});
+
+let state = DEFAULT();
+let KEY = "ficha-personaje-v1";
+const $ = s => document.querySelector(s);
+const msg = t => { $("#msg").textContent = t; clearTimeout(msg.t); msg.t = setTimeout(()=>$("#msg").textContent="", 3500); };
+
+/* ---------- Almacenamiento (navegador) ---------- */
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ msg("No se pudo guardar en el navegador (imagen muy pesada?)."); }
+}
+function load(){
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) merge(JSON.parse(raw));
+  } catch(e){}
+}
+function merge(data){
+  const base = DEFAULT();
+  base.name = String(data.name ?? "");
+  base.img = typeof data.img === "string" ? data.img : "";
+  for (const k in base.stats){
+    const s = data.stats?.[k];
+    if (!s) continue;
+    const max = Math.max(1, Number(s.max) || base.stats[k].max);
+    base.stats[k].max = max;
+    base.stats[k].cur = Math.min(max, Math.max(0, Number(s.cur) ?? max));
+    if (typeof s.color === "string") base.stats[k].color = s.color;
+  }
+  state = base;
+}
+
+/* ---------- Interfaz ---------- */
+const refs = {};
+function build(){
+  const box = $("#stats"); box.innerHTML = "";
+  for (const k in state.stats){
+    const s = state.stats[k];
+    const el = document.createElement("section");
+    el.className = "stat group-" + s.kind;
+    el.innerHTML = `
+      <div class="top"><b>${s.label}</b><span class="pen" hidden></span><span class="val"></span></div>
+      <div class="bar"><div class="fill"></div></div>
+      <div class="row">
+        <input type="number" class="amt" min="1" value="1" aria-label="Cantidad">
+        <button class="dmg">Daño</button>
+        <button class="heal">Recuperar</button>
+        <span class="sp"></span>
+        <label class="cfg">Máx <input type="number" class="max" min="1" aria-label="Máximo de ${s.label}"></label>
+        <input type="color" class="col" aria-label="Color de ${s.label}">
+      </div>`;
+    box.append(el);
+    const r = refs[k] = {
+      el, val:el.querySelector(".val"), fill:el.querySelector(".fill"), bar:el.querySelector(".bar"),
+      pen:el.querySelector(".pen"), amt:el.querySelector(".amt"), max:el.querySelector(".max"), col:el.querySelector(".col")
+    };
+    if (s.kind === "salud"){
+      for (const f of [1/3, 2/3]){
+        const t = document.createElement("i"); t.className = "tick"; t.style.left = (f*100)+"%"; r.bar.append(t);
+      }
+    }
+    const amount = () => Math.max(0, Math.floor(Number(r.amt.value) || 0));
+    el.querySelector(".dmg").onclick  = () => change(k, -amount());
+    el.querySelector(".heal").onclick = () => change(k, +amount());
+    r.max.onchange = () => {
+      const nm = Math.max(1, Math.floor(Number(r.max.value) || 1));
+      const delta = nm - s.max;
+      s.max = nm; s.cur = Math.min(nm, Math.max(0, s.cur + delta));
+      refresh(k); save();
+    };
+    r.col.oninput = () => { s.color = r.col.value; refresh(k); save(); };
+  }
+  refreshAll();
+}
+
+/* Penalizador de salud: cada tercio de salud perdido suma -1 (máx. -3) */
+function penalty(s){
+  const lost = s.max - s.cur;
+  return Math.min(3, Math.floor(lost / (s.max / 3) + 1e-9));
+}
+
+function change(k, d){
+  const s = state.stats[k];
+  s.cur = Math.min(s.max, Math.max(0, s.cur + d));
+  refresh(k); save();
+}
+
+function refresh(k){
+  const s = state.stats[k], r = refs[k];
+  r.el.style.setProperty("--c", s.color);
+  r.fill.style.width = (s.cur / s.max * 100) + "%";
+  r.val.textContent = `${s.cur} / ${s.max}`;
+  if (document.activeElement !== r.max) r.max.value = s.max;
+  r.col.value = s.color;
+  if (s.kind === "salud"){
+    const p = penalty(s);
+    r.pen.hidden = false;
+    r.pen.textContent = p ? `Penalizador -${p}` : "Sin penalizador";
+    r.pen.classList.toggle("on", p > 0);
+  }
+}
+function refreshAll(){
+  for (const k in state.stats) refresh(k);
+  $("#name").value = state.name;
+  setAvatar();
+}
+
+function setAvatar(){
+  const a = $("#avatar");
+  a.style.backgroundImage = state.img ? `url(${state.img})` : "";
+  a.classList.toggle("has", !!state.img);
+  a.textContent = state.img ? "" : "Subir imagen";
+}
+
+/* ---------- Nombre e imagen ---------- */
+$("#name").oninput = e => { state.name = e.target.value; save(); };
+$("#avatar").onclick = () => $("#file").click();
+$("#avatar").onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#file").click(); } };
+$("#file").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const S = 256, c = document.createElement("canvas"); c.width = c.height = S;
+    const m = Math.min(img.width, img.height);
+    c.getContext("2d").drawImage(img, (img.width-m)/2, (img.height-m)/2, m, m, 0, 0, S, S);
+    state.img = c.toDataURL("image/jpeg", 0.85);
+    setAvatar(); save(); URL.revokeObjectURL(img.src);
+  };
+  img.onerror = () => msg("No se pudo leer la imagen.");
+  img.src = URL.createObjectURL(f);
+  e.target.value = "";
+};
+
+/* ---------- JSON ---------- */
+$("#export").onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (state.name.trim() || "personaje").replace(/[^\w\-]+/g, "_") + ".json";
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  msg("Archivo exportado.");
+};
+$("#import").onclick = () => $("#jsonfile").click();
+$("#jsonfile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { merge(JSON.parse(await f.text())); build(); save(); msg("Ficha importada."); }
+  catch(err){ msg("El archivo no es un JSON válido."); }
+  e.target.value = "";
+};
+$("#reset").onclick = () => {
+  if (!confirm("¿Reiniciar toda la ficha? Se borrarán los datos guardados.")) return;
+  state = DEFAULT(); build(); save();
+};
+
+/* ---------- Owlbear Rodeo (opcional: separa los datos por sala) ---------- */
+async function init(){
+  try {
+    const { default: OBR } = await import("https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm");
+    await new Promise((ok, no) => { OBR.onReady(ok); setTimeout(no, 2500); });
+    if (OBR.isAvailable) KEY = "ficha-personaje-v1:" + OBR.room.id;
+  } catch(e){ /* fuera de Owlbear: funciona igual */ }
+  load(); build();
+}
+init();
+</script>
+</body>
+</html>

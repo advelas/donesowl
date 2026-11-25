@@ -1,0 +1,14 @@
+{
+  "name": "Ficha de personaje",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "description": "Controla resistencias y salud de tu personaje.",
+  "author": "Tu nombre",
+  "action": {
+    "title": "Ficha",
+    "icon": "/icon.svg",
+    "popover": "/index.html",
+    "width": 400,
+    "height": 720
+  }
+}
