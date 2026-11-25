@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "manifest_version": 1,
   "description": "Controla resistencias y salud de tu personaje.",
-  "author": "Tu nombre",
+  "author": "advelas",
   "action": {
     "title": "Ficha",
-    "icon": "/icon.svg",
-    "popover": "/index.html",
+    "icon": "https://advelas.github.io/donesowl/icon.svg",
+    "popover": "https://advelas.github.io/donesowl/index.html",
     "width": 400,
     "height": 720
   }
