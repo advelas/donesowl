@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Ficha - segundo plano</title></head>
+<body>
+<script type="module">
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
+const REACT = "com.advelas.donesowl/reaccion", CH = "com.advelas.donesowl/evento";
+
+OBR.onReady(() => {
+  OBR.broadcast.onMessage(CH, async ev => {
+    const d = ev.data;
+    if (!d || typeof d !== "object") return;
+    if (d.type === "reaccion" && typeof d.name === "string") {
+      OBR.notification.show(d.name.slice(0, 40) + " usó su reacción", "INFO");
+    }
+    if (d.type === "reset") {
+      if ((await OBR.player.getRole()) !== "GM") await OBR.player.setMetadata({ [REACT]: false });
+      OBR.notification.show("Nueva ronda: reacciones restauradas", "SUCCESS");
+    }
+  });
+});
+</script>
+</body>
+</html>

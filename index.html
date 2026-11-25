@@ -54,6 +54,12 @@ footer button{flex:1}
 .mini .b i{display:block;height:100%}
 .mini span:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .empty{color:var(--muted);padding:12px;text-align:center}
+.react{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--panel);cursor:pointer;font-weight:600}
+.react:has(input:checked){background:#4d4208;outline:2px solid #f2c94c}
+.react input:disabled+span{opacity:.5}
+.pc.hot{background:#4d4208;outline:2px solid #f2c94c}
+.rb{margin-left:6px;font:700 11px system-ui,sans-serif;padding:1px 7px;border-radius:99px;background:#f2c94c;color:#2a2200;vertical-align:middle}
+.newround{background:#b8912a;color:#1d1700;font-weight:600;padding:9px}
 </style>
 </head>
 <body>
@@ -64,6 +70,7 @@ footer button{flex:1}
   <input id="name" placeholder="Nombre del personaje" maxlength="40" aria-label="Nombre del personaje">
   <input id="file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
 </header>
+<label class="react"><input type="checkbox" id="react"><span>Reacción</span></label>
 
 <main id="stats" style="display:flex;flex-direction:column;gap:8px"></main>
 
@@ -272,7 +279,7 @@ function ensureThumb(cb){
 }
 
 function share(){
-  if (!OBR) return;
+  if (!OBR || isGM) return;
   clearTimeout(share.t);
   share.t = setTimeout(() => ensureThumb(() => {
     let payload = { on:false };
@@ -285,7 +292,7 @@ function share(){
   }), 250);
 }
 
-function cardHTML(name, img, stats, tag){
+function cardHTML(name, img, stats, tag, hot){
   const rows = Object.keys(SHORT).map(k => {
     const v = stats[k]; if (!Array.isArray(v)) return "";
     const cur = num(v[0]), max = Math.max(1, num(v[1]));
@@ -298,22 +305,42 @@ function cardHTML(name, img, stats, tag){
     return `<div class="mini"><span>${SHORT[k]}</span><div class="b"><i style="width:${Math.min(100, cur/max*100)}%;background:${col}"></i></div><span>${cur}/${max}${extra}</span></div>`;
   }).join("");
   const bg = okImg(img) ? `background-image:url(&quot;${img}&quot;)` : "";
-  return `<article class="pc"><div class="th" style="${bg}"></div><div class="info"><h3>${esc(name)}${tag}</h3>${rows}</div></article>`;
+  return `<article class="pc${hot ? " hot" : ""}"><div class="th" style="${bg}"></div><div class="info"><h3>${esc(name)}${tag}${hot ? '<span class="rb">Reacción</span>' : ""}</h3>${rows}</div></article>`;
 }
+
+const REACT = "com.advelas.donesowl/reaccion", CH = "com.advelas.donesowl/evento";
+let isGM = false, reacting = false;
 
 function renderParty(){
   const box = $("#party"); if (box.hidden) return;
   if (!OBR){ box.innerHTML = '<div class="empty">La party solo está disponible dentro de Owlbear Rodeo.</div>'; return; }
-  const own = {};
-  for (const k in state.stats){ const s = state.stats[k]; own[k] = [s.cur, s.max, s.color]; }
-  let html = cardHTML(state.name || "Mi personaje", state.img, own, " (tú)");
+  let html = "";
+  if (isGM) html += '<button data-reset class="newround">Nueva ronda: limpiar reacciones</button>';
+  else {
+    const own = {};
+    for (const k in state.stats){ const s = state.stats[k]; own[k] = [s.cur, s.max, s.color]; }
+    html += cardHTML(state.name || "Mi personaje", state.img, own, " (tú)", reacting);
+  }
+  let n = 0;
   [...players].sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
     const d = p.metadata?.[META];
-    if (d && d.on && d.s) html += cardHTML(d.name || p.name, d.thumb, d.s, d.name ? ` <small style="color:var(--muted);font-weight:400">${esc(p.name)}</small>` : "");
-    else if (p.role !== "GM") html += `<div class="pc"><div class="info"><h3>${esc(p.name)}</h3><div class="empty" style="padding:2px;text-align:left">No compartió su ficha.</div></div></div>`;
+    const hot = p.metadata?.[REACT] === true;
+    if (d && d.on && d.s){
+      n++;
+      html += cardHTML(d.name || p.name, d.thumb, d.s, d.name ? ` <small style="color:var(--muted);font-weight:400">${esc(p.name)}</small>` : "", hot);
+    } else if (p.role !== "GM"){
+      n++;
+      html += `<div class="pc${hot ? " hot" : ""}"><div class="info"><h3>${esc(p.name)}${hot ? '<span class="rb">Reacción</span>' : ""}</h3><div class="empty" style="padding:2px;text-align:left">No compartió su ficha.</div></div></div>`;
+    }
   });
+  if (isGM && !n) html += '<div class="empty">Aún no hay jugadores en la sala.</div>';
   box.innerHTML = html;
 }
+$("#party").onclick = e => {
+  if (!e.target.closest("[data-reset]") || !OBR) return;
+  OBR.broadcast.sendMessage(CH, { type:"reset" }, { destination:"ALL" });
+  msg("Reacciones restauradas.");
+};
 
 function tab(party){
   $("#mine").hidden = party; $("#party").hidden = !party;
@@ -323,6 +350,26 @@ function tab(party){
 $("#tabMine").onclick = () => tab(false);
 $("#tabParty").onclick = () => tab(true);
 $("#share").onchange = e => { state.share = e.target.checked; save(); };
+
+$("#react").onchange = async e => {
+  if (!OBR) return;
+  reacting = e.target.checked;
+  OBR.player.setMetadata({ [REACT]: reacting });
+  if (reacting){
+    const name = state.name.trim() || await OBR.player.getName();
+    OBR.broadcast.sendMessage(CH, { type:"reaccion", name }, { destination:"ALL" });
+  }
+  renderParty();
+};
+
+/* El GM solo ve la party: sin ficha propia y sin compartir nada */
+function applyRole(role){
+  const gm = role === "GM";
+  isGM = gm;
+  document.querySelector(".tabs").hidden = gm;
+  if (gm && OBR) OBR.player.setMetadata({ [META]: { on:false }, [REACT]: false });
+  tab(gm);
+}
 
 async function init(){
   try {
@@ -334,9 +381,20 @@ async function init(){
       KEY = "ficha-personaje-v1:" + OBR.room.id;
       players = await OBR.party.getPlayers();
       OBR.party.onChange(ps => { players = ps; renderParty(); });
+      reacting = (await OBR.player.getMetadata())[REACT] === true;
+      let role = await OBR.player.getRole();
+      OBR.player.onChange(p => {
+        reacting = p.metadata?.[REACT] === true;
+        $("#react").checked = reacting;
+        if ((p.role === "GM") !== isGM) applyRole(p.role);
+        renderParty();
+      });
+      applyRole(role);
     }
   } catch(e){ /* fuera de Owlbear: funciona igual, sin party */ }
-  load(); build(); share();
+  $("#react").disabled = !OBR;
+  $("#react").checked = reacting;
+  load(); build(); share(); renderParty();
 }
 init();
 </script>
