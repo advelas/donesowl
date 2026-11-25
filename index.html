@@ -40,9 +40,25 @@ input[type=color]{width:24px;height:24px;border:0;padding:0;background:none;curs
 footer{display:flex;gap:6px;flex-wrap:wrap}
 footer button{flex:1}
 #msg{color:var(--muted);font-size:12px;min-height:16px}
+[hidden]{display:none!important}
+.view{display:flex;flex-direction:column;gap:10px}
+.tabs{display:flex;gap:6px}
+.tabs button{flex:1;background:var(--panel);color:var(--muted)}
+.tabs button.on{background:var(--line);color:var(--text);font-weight:600}
+.pc{display:flex;gap:10px;background:var(--panel);border-radius:10px;padding:10px}
+.pc .th{width:56px;height:56px;border-radius:10px;background:#14121a center/cover no-repeat;flex:none}
+.pc .info{flex:1;min-width:0}
+.pc h3{margin:0 0 4px;font:600 16px Georgia,"Times New Roman",serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini{display:grid;grid-template-columns:84px 1fr 56px;gap:6px;align-items:center;font-size:11px;color:var(--muted);margin-top:3px}
+.mini .b{height:7px;background:#14121a;border-radius:4px;overflow:hidden}
+.mini .b i{display:block;height:100%}
+.mini span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);padding:12px;text-align:center}
 </style>
 </head>
 <body>
+<nav class="tabs"><button id="tabMine" class="on">Mi ficha</button><button id="tabParty">Party</button></nav>
+<div id="mine" class="view">
 <header>
   <div id="avatar" title="Subir imagen" tabindex="0" role="button">Subir imagen</div>
   <input id="name" placeholder="Nombre del personaje" maxlength="40" aria-label="Nombre del personaje">
@@ -51,17 +67,21 @@ footer button{flex:1}
 
 <main id="stats" style="display:flex;flex-direction:column;gap:8px"></main>
 
+<label class="cfg" style="font-size:13px"><input type="checkbox" id="share"> Compartir mi ficha con la party</label>
 <footer>
   <button id="export">Exportar JSON</button>
   <button id="import">Importar JSON</button>
   <button id="reset">Reiniciar</button>
   <input id="jsonfile" type="file" accept="application/json,.json" hidden>
 </footer>
+</div>
+<div id="party" class="view" hidden></div>
 <div id="msg" aria-live="polite"></div>
 
 <script type="module">
 const DEFAULT = () => ({
   name: "",
+  share: true,
   img: "",
   stats: {
     resFis:  { label:"Resistencia física",     kind:"res",   max:10, cur:10, color:"#d98a3d" },
@@ -79,6 +99,7 @@ const msg = t => { $("#msg").textContent = t; clearTimeout(msg.t); msg.t = setTi
 
 /* ---------- Almacenamiento (navegador) ---------- */
 function save(){
+  share(); renderParty();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ msg("No se pudo guardar en el navegador (imagen muy pesada?)."); }
 }
 function load(){
@@ -91,6 +112,7 @@ function merge(data){
   const base = DEFAULT();
   base.name = String(data.name ?? "");
   base.img = typeof data.img === "string" ? data.img : "";
+  base.share = data.share !== false;
   for (const k in base.stats){
     const s = data.stats?.[k];
     if (!s) continue;
@@ -174,6 +196,7 @@ function refresh(k){
 function refreshAll(){
   for (const k in state.stats) refresh(k);
   $("#name").value = state.name;
+  $("#share").checked = state.share;
   setAvatar();
 }
 
@@ -225,14 +248,95 @@ $("#reset").onclick = () => {
   state = DEFAULT(); build(); save();
 };
 
-/* ---------- Owlbear Rodeo (opcional: separa los datos por sala) ---------- */
+/* ---------- Party (Owlbear Rodeo) ---------- */
+let OBR = null, players = [];
+const META = "com.advelas.donesowl/ficha";
+const SHORT = { resFis:"Res. física", resEne:"Res. energética", resMen:"Res. mental", salud:"Salud", saludMen:"Salud mental" };
+const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = v => Math.max(0, Number(v) || 0);
+const okImg = t => typeof t === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(t);
+
+/* Miniatura de 64 px: la imagen completa pesa demasiado para los metadatos */
+let thumb = "", thumbSrc = null;
+function ensureThumb(cb){
+  if (!state.img){ thumb = ""; thumbSrc = ""; return cb(); }
+  if (thumbSrc === state.img) return cb();
+  const im = new Image();
+  im.onload = () => {
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    c.getContext("2d").drawImage(im, 0, 0, 64, 64);
+    thumb = c.toDataURL("image/jpeg", 0.6); thumbSrc = state.img; cb();
+  };
+  im.onerror = () => { thumb = ""; cb(); };
+  im.src = state.img;
+}
+
+function share(){
+  if (!OBR) return;
+  clearTimeout(share.t);
+  share.t = setTimeout(() => ensureThumb(() => {
+    let payload = { on:false };
+    if (state.share){
+      const sx = {};
+      for (const k in state.stats){ const s = state.stats[k]; sx[k] = [s.cur, s.max, s.color]; }
+      payload = { on:true, name:state.name, thumb, s:sx };
+    }
+    OBR.player.setMetadata({ [META]: payload }).catch(()=>{});
+  }), 250);
+}
+
+function cardHTML(name, img, stats, tag){
+  const rows = Object.keys(SHORT).map(k => {
+    const v = stats[k]; if (!Array.isArray(v)) return "";
+    const cur = num(v[0]), max = Math.max(1, num(v[1]));
+    const col = /^#[0-9a-f]{6}$/i.test(v[2]) ? v[2] : "#888888";
+    let extra = "";
+    if (k === "salud" || k === "saludMen"){
+      const p = penalty({ cur: Math.min(cur, max), max });
+      if (p) extra = ` <b style="color:var(--danger)">-${p}</b>`;
+    }
+    return `<div class="mini"><span>${SHORT[k]}</span><div class="b"><i style="width:${Math.min(100, cur/max*100)}%;background:${col}"></i></div><span>${cur}/${max}${extra}</span></div>`;
+  }).join("");
+  const bg = okImg(img) ? `background-image:url(&quot;${img}&quot;)` : "";
+  return `<article class="pc"><div class="th" style="${bg}"></div><div class="info"><h3>${esc(name)}${tag}</h3>${rows}</div></article>`;
+}
+
+function renderParty(){
+  const box = $("#party"); if (box.hidden) return;
+  if (!OBR){ box.innerHTML = '<div class="empty">La party solo está disponible dentro de Owlbear Rodeo.</div>'; return; }
+  const own = {};
+  for (const k in state.stats){ const s = state.stats[k]; own[k] = [s.cur, s.max, s.color]; }
+  let html = cardHTML(state.name || "Mi personaje", state.img, own, " (tú)");
+  [...players].sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
+    const d = p.metadata?.[META];
+    if (d && d.on && d.s) html += cardHTML(d.name || p.name, d.thumb, d.s, d.name ? ` <small style="color:var(--muted);font-weight:400">${esc(p.name)}</small>` : "");
+    else if (p.role !== "GM") html += `<div class="pc"><div class="info"><h3>${esc(p.name)}</h3><div class="empty" style="padding:2px;text-align:left">No compartió su ficha.</div></div></div>`;
+  });
+  box.innerHTML = html;
+}
+
+function tab(party){
+  $("#mine").hidden = party; $("#party").hidden = !party;
+  $("#tabMine").classList.toggle("on", !party); $("#tabParty").classList.toggle("on", party);
+  renderParty();
+}
+$("#tabMine").onclick = () => tab(false);
+$("#tabParty").onclick = () => tab(true);
+$("#share").onchange = e => { state.share = e.target.checked; save(); };
+
 async function init(){
   try {
-    const { default: OBR } = await import("https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm");
-    await new Promise((ok, no) => { OBR.onReady(ok); setTimeout(no, 2500); });
-    if (OBR.isAvailable) KEY = "ficha-personaje-v1:" + OBR.room.id;
-  } catch(e){ /* fuera de Owlbear: funciona igual */ }
-  load(); build();
+    const mod = await import("https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm");
+    const sdk = mod.default;
+    await new Promise((ok, no) => { sdk.onReady(ok); setTimeout(no, 2500); });
+    if (sdk.isAvailable){
+      OBR = sdk;
+      KEY = "ficha-personaje-v1:" + OBR.room.id;
+      players = await OBR.party.getPlayers();
+      OBR.party.onChange(ps => { players = ps; renderParty(); });
+    }
+  } catch(e){ /* fuera de Owlbear: funciona igual, sin party */ }
+  load(); build(); share();
 }
 init();
 </script>
