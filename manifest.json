@@ -2,10 +2,10 @@
   "name": "Ficha de personaje",
   "version": "1.3.0",
   "manifest_version": 1,
-  "description": "Controla resistencias y salud de tu personaje.",
+  "description": "Gestor de personajes para el sistema Dones",
   "author": "advelas",
   "action": {
-    "title": "Ficha",
+    "title": "¡Dones!",
     "icon": "https://advelas.github.io/donesowl/icon.svg",
     "popover": "https://advelas.github.io/donesowl/index.html",
     "width": 780,
