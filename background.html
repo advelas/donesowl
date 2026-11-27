@@ -4,18 +4,55 @@
 <body>
 <script type="module">
 import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
-const REACT = "com.advelas.donesowl/reaccion", CH = "com.advelas.donesowl/evento";
+
+const CH = "com.advelas.donesowl/evento";
+const ROOMK = "com.advelas.donesowl/cola";
+
+// Solo el GM escribe la cola. Las operaciones se hacen una tras otra
+// para respetar el orden en que llegan los mensajes.
+let chain = Promise.resolve();
+const run = fn => { chain = chain.then(fn).catch(() => {}); };
+const isGM = async () => (await OBR.player.getRole()) === "GM";
+const readQ = async () => {
+  const q = (await OBR.room.getMetadata())[ROOMK]?.q;
+  return Array.isArray(q) ? q : [];
+};
+const writeQ = q => OBR.room.setMetadata({ [ROOMK]: { q } });
 
 OBR.onReady(() => {
   OBR.broadcast.onMessage(CH, async ev => {
     const d = ev.data;
     if (!d || typeof d !== "object") return;
-    if (d.type === "reaccion" && typeof d.name === "string") {
-      OBR.notification.show(d.name.slice(0, 40) + " usó su reacción", "INFO");
+
+    if (d.type === "reaccion" && typeof d.id === "string" && typeof d.name === "string") {
+      const name = d.name.slice(0, 40);
+      OBR.notification.show(name + " usó su reacción", "INFO");
+      run(async () => {
+        if (!(await isGM())) return;
+        const q = await readQ();
+        if (q.some(e => e.id === d.id)) return;
+        q.push({ id: d.id, name, done: false });
+        await writeQ(q);
+      });
     }
-    if (d.type === "reset") {
-      if ((await OBR.player.getRole()) !== "GM") await OBR.player.setMetadata({ [REACT]: false });
+
+    else if (d.type === "reset") {
       OBR.notification.show("Nueva ronda: reacciones restauradas", "SUCCESS");
+      run(async () => { if (await isGM()) await writeQ([]); });
+    }
+
+    else if (d.type === "op" && typeof d.id === "string") {
+      if (d.op === "return" && d.id === (await OBR.player.getId())) {
+        OBR.notification.show("El GM te devolvió tu reacción", "SUCCESS");
+      }
+      run(async () => {
+        if (!(await isGM())) return;
+        let q = await readQ();
+        if (d.op === "resolve") q = q.map(e => e.id === d.id ? { ...e, done: !e.done } : e);
+        else if (d.op === "return") q = q.filter(e => e.id !== d.id);
+        else return;
+        await writeQ(q);
+      });
     }
   });
 });

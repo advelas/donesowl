@@ -29,11 +29,14 @@ header{display:flex;gap:12px;align-items:center}
 .pen{font-size:12px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--line);color:var(--muted)}
 .pen.on{background:var(--danger);color:#fff}
 .row{display:flex;gap:6px;align-items:center}
-.row input[type=number]{width:62px;background:#14121a;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 6px}
+.row input[type=number],.row input.amt{width:62px;background:#14121a;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 6px}
 button{background:var(--line);color:var(--text);border:0;border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
 button:hover{filter:brightness(1.2)}
 button:focus-visible,input:focus-visible{outline:2px solid #9ec5ff;outline-offset:1px}
 .dmg{background:var(--danger);color:#fff}
+.prot{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 8px;font-size:12px;color:var(--muted)}
+.prot label{display:flex;gap:4px;align-items:center;cursor:pointer;color:var(--text);font-weight:600}
+.ok{padding:4px 10px;font-size:18px;line-height:1}
 .sp{flex:1}
 .cfg{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:12px}
 input[type=color]{width:24px;height:24px;border:0;padding:0;background:none;cursor:pointer}
@@ -56,7 +59,13 @@ footer button{flex:1}
 .empty{color:var(--muted);padding:12px;text-align:center}
 .react{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--panel);cursor:pointer;font-weight:600}
 .react:has(input:checked){background:#4d4208;outline:2px solid #f2c94c}
-.react input:disabled+span{opacity:.5}
+.react input:disabled{cursor:not-allowed}
+.qi{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.qi button{padding:4px 8px;font-size:12px}
+.qn{width:22px;height:22px;border-radius:50%;background:#f2c94c;color:#2a2200;font:700 12px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;flex:none}
+.qt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qi.done .qt{text-decoration:line-through;color:var(--muted)}
+.qi.done .qn{background:var(--line);color:var(--muted)}
 .pc.hot{background:#4d4208;outline:2px solid #f2c94c}
 .rb{margin-left:6px;font:700 11px system-ui,sans-serif;padding:1px 7px;border-radius:99px;background:#f2c94c;color:#2a2200;vertical-align:middle}
 .newround{background:#b8912a;color:#1d1700;font-weight:600;padding:9px}
@@ -76,10 +85,7 @@ footer button{flex:1}
 
 <label class="cfg" style="font-size:13px"><input type="checkbox" id="share"> Compartir mi ficha con la party</label>
 <footer>
-  <button id="export">Exportar JSON</button>
-  <button id="import">Importar JSON</button>
-  <button id="reset">Reiniciar</button>
-  <input id="jsonfile" type="file" accept="application/json,.json" hidden>
+  <button id="reset">Reiniciar ficha</button>
 </footer>
 </div>
 <div id="party" class="view" hidden></div>
@@ -96,6 +102,7 @@ const DEFAULT = () => ({
     resMen:  { label:"Resistencia mental",     kind:"res",   max:10, cur:10, color:"#9b7bd6" },
     salud:   { label:"Salud",                  kind:"salud", max:10, cur:10, color:"#d9534f" },
     saludMen:{ label:"Salud mental",           kind:"salud", max:10, cur:10, color:"#c0508f" },
+    hpExtra: { label:"HP Extra",               kind:"res",   max:0,  cur:0,  color:"#9aa0a6", unlimited:true, prot:["resFis"] },
   }
 });
 
@@ -123,9 +130,17 @@ function merge(data){
   for (const k in base.stats){
     const s = data.stats?.[k];
     if (!s) continue;
-    const max = Math.max(1, Number(s.max) || base.stats[k].max);
-    base.stats[k].max = max;
-    base.stats[k].cur = Math.min(max, Math.max(0, Number(s.cur) ?? max));
+    const cur = Number.isFinite(Number(s.cur)) ? Number(s.cur) : base.stats[k].cur;
+    if (base.stats[k].unlimited){
+      base.stats[k].cur = Math.max(0, Math.floor(cur));
+      const pl = Array.isArray(s.prot) ? s.prot : (s.prot ? [s.prot] : base.stats[k].prot);
+      base.stats[k].prot = pl.filter(x => ['resFis','resEne','resMen'].includes(x));
+    }
+    else {
+      const max = Math.max(1, Number(s.max) || base.stats[k].max);
+      base.stats[k].max = max;
+      base.stats[k].cur = Math.min(max, Math.max(0, cur));
+    }
     if (typeof s.color === "string") base.stats[k].color = s.color;
   }
   state = base;
@@ -143,9 +158,8 @@ function build(){
       <div class="top"><b>${s.label}</b><span class="pen" hidden></span><span class="val"></span></div>
       <div class="bar"><div class="fill"></div></div>
       <div class="row">
-        <input type="number" class="amt" min="1" value="1" aria-label="Cantidad">
-        <button class="dmg">Daño</button>
-        <button class="heal">Recuperar</button>
+        <input type="text" class="amt" inputmode="text" autocomplete="off" placeholder="-3 / +2" aria-label="Cambio: sin signo resta, con + suma">
+        <button class="ok" aria-label="Aplicar cambio">☑️</button>
         <span class="sp"></span>
         <label class="cfg">Máx <input type="number" class="max" min="1" aria-label="Máximo de ${s.label}"></label>
         <input type="color" class="col" aria-label="Color de ${s.label}">
@@ -155,14 +169,29 @@ function build(){
       el, val:el.querySelector(".val"), fill:el.querySelector(".fill"), bar:el.querySelector(".bar"),
       pen:el.querySelector(".pen"), amt:el.querySelector(".amt"), max:el.querySelector(".max"), col:el.querySelector(".col")
     };
+    if (s.unlimited){
+      const pr = document.createElement("div"); pr.className = "prot";
+      pr.title = "El daño a las resistencias marcadas se resta primero del HP Extra. FIS y ENE también protegen la Salud; MEN, la Salud mental.";
+      pr.innerHTML = "<span>Protege:</span>" + [["resFis","FIS"],["resEne","ENE"],["resMen","MEN"]]
+        .map(([v, t]) => `<label><input type="checkbox" value="${v}"> ${t}</label>`).join("");
+      pr.onchange = () => { s.prot = [...pr.querySelectorAll('input:checked')].map(i => i.value); save(); };
+      r.amt.placeholder = "+5"; r.amt.setAttribute("aria-label", "HP Extra a sumar");
+      el.querySelector(".top").after(pr);
+      r.prot = pr;
+    }
     if (s.kind === "salud"){
       for (const f of [1/3, 2/3]){
         const t = document.createElement("i"); t.className = "tick"; t.style.left = (f*100)+"%"; r.bar.append(t);
       }
     }
-    const amount = () => Math.max(0, Math.floor(Number(r.amt.value) || 0));
-    el.querySelector(".dmg").onclick  = () => change(k, -amount());
-    el.querySelector(".heal").onclick = () => change(k, +amount());
+    const apply = () => {
+      if (!r.amt.value.trim()) return;
+      const d = parseDelta(r.amt.value, s.unlimited ? "+" : "-");
+      if (d === null){ msg("Usa números con + o -. Sin signo, resta. Ej.: 3, +2, -4+1"); return; }
+      change(k, d); r.amt.value = "";
+    };
+    el.querySelector(".ok").onclick = apply;
+    r.amt.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); apply(); } };
     r.max.onchange = () => {
       const nm = Math.max(1, Math.floor(Number(r.max.value) || 1));
       const delta = nm - s.max;
@@ -174,14 +203,41 @@ function build(){
   refreshAll();
 }
 
-/* Penalizador de salud: cada tercio de salud perdido suma -1 (máx. -3) */
+/* Penalizador de salud: -2 al perder un tercio, -5 al perder dos tercios (o más) */
 function penalty(s){
-  const lost = s.max - s.cur;
-  return Math.min(3, Math.floor(lost / (s.max / 3) + 1e-9));
+  const thirds = Math.min(3, Math.floor((s.max - s.cur) / (s.max / 3) + 1e-9));
+  return [0, 2, 5, 5][thirds];
+}
+
+/* Qué resistencias del HP Extra protegen a cada medidor */
+const PROT = {
+  resFis:["resFis"], resEne:["resEne"], resMen:["resMen"],
+  salud:["resFis", "resEne"], saludMen:["resMen"]
+};
+
+/* "5" -> -5 | "+3" -> +3 | "-2" -> -2 | "+4-2" -> +2 | "5+3" -> -2 (el primer número sin signo resta) */
+function parseDelta(str, def = "-"){
+  let t = String(str).replace(/\s+/g, "");
+  if (!/^[+-]?\d+([+-]\d+)*$/.test(t)) return null;
+  if (!/^[+-]/.test(t)) t = def + t;
+  return t.match(/[+-]\d+/g).reduce((a, x) => a + parseInt(x, 10), 0);
 }
 
 function change(k, d){
   const s = state.stats[k];
+  if (s.unlimited){
+    if (d < 0){ msg("El HP Extra solo se suma. Se gasta al recibir daño en la resistencia que protege."); return; }
+    s.cur += d; refresh(k); save(); return;
+  }
+  if (d < 0){
+    const hp = state.stats.hpExtra;
+    if (hp && (PROT[k] || []).some(x => hp.prot.includes(x)) && hp.cur > 0){
+      const absorbed = Math.min(hp.cur, -d);
+      hp.cur -= absorbed; d += absorbed;
+      refresh("hpExtra");
+      msg(`HP Extra absorbió ${absorbed}` + (d < 0 ? `; ${-d} pasan a ${s.label}.` : "."));
+    }
+  }
   s.cur = Math.min(s.max, Math.max(0, s.cur + d));
   refresh(k); save();
 }
@@ -189,9 +245,12 @@ function change(k, d){
 function refresh(k){
   const s = state.stats[k], r = refs[k];
   r.el.style.setProperty("--c", s.color);
-  r.fill.style.width = (s.cur / s.max * 100) + "%";
-  r.val.textContent = `${s.cur} / ${s.max}`;
-  if (document.activeElement !== r.max) r.max.value = s.max;
+  if (r.prot) r.prot.querySelectorAll('input').forEach(i => { i.checked = s.prot.includes(i.value); });
+  r.bar.hidden = !!s.unlimited;
+  r.max.closest("label").hidden = !!s.unlimited;
+  r.fill.style.width = s.unlimited ? "100%" : (s.cur / s.max * 100) + "%";
+  r.val.textContent = s.unlimited ? String(s.cur) : `${s.cur} / ${s.max}`;
+  if (!s.unlimited && document.activeElement !== r.max) r.max.value = s.max;
   r.col.value = s.color;
   if (s.kind === "salud"){
     const p = penalty(s);
@@ -233,32 +292,24 @@ $("#file").onchange = e => {
   e.target.value = "";
 };
 
-/* ---------- JSON ---------- */
-$("#export").onclick = () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = (state.name.trim() || "personaje").replace(/[^\w\-]+/g, "_") + ".json";
-  document.body.append(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-  msg("Archivo exportado.");
-};
-$("#import").onclick = () => $("#jsonfile").click();
-$("#jsonfile").onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  try { merge(JSON.parse(await f.text())); build(); save(); msg("Ficha importada."); }
-  catch(err){ msg("El archivo no es un JSON válido."); }
-  e.target.value = "";
-};
-$("#reset").onclick = () => {
-  if (!confirm("¿Reiniciar toda la ficha? Se borrarán los datos guardados.")) return;
-  state = DEFAULT(); build(); save();
+/* ---------- Reiniciar (con confirmación en dos toques) ---------- */
+const resetBtn = $("#reset");
+function disarmReset(){ clearTimeout(resetBtn.t); resetBtn.dataset.armed = ""; resetBtn.textContent = "Reiniciar ficha"; resetBtn.classList.remove("dmg"); }
+resetBtn.onclick = () => {
+  if (resetBtn.dataset.armed){
+    disarmReset(); state = DEFAULT(); build(); save(); msg("Ficha reiniciada.");
+    return;
+  }
+  resetBtn.dataset.armed = "1";
+  resetBtn.textContent = "¿Seguro? Se borra toda la ficha. Toca otra vez";
+  resetBtn.classList.add("dmg");
+  resetBtn.t = setTimeout(disarmReset, 5000);
 };
 
 /* ---------- Party (Owlbear Rodeo) ---------- */
 let OBR = null, players = [];
 const META = "com.advelas.donesowl/ficha";
-const SHORT = { resFis:"Res. física", resEne:"Res. energética", resMen:"Res. mental", salud:"Salud", saludMen:"Salud mental" };
+const SHORT = { resFis:"Res. física", resEne:"Res. energética", resMen:"Res. mental", salud:"Salud", saludMen:"Salud mental", hpExtra:"HP Extra" };
 const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num = v => Math.max(0, Number(v) || 0);
 const okImg = t => typeof t === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(t);
@@ -285,7 +336,7 @@ function share(){
     let payload = { on:false };
     if (state.share){
       const sx = {};
-      for (const k in state.stats){ const s = state.stats[k]; sx[k] = [s.cur, s.max, s.color]; }
+      for (const k in state.stats){ const s = state.stats[k]; sx[k] = [s.cur, s.unlimited ? null : s.max, s.color, s.prot]; }
       payload = { on:true, name:state.name, thumb, s:sx };
     }
     OBR.player.setMetadata({ [META]: payload }).catch(()=>{});
@@ -295,8 +346,13 @@ function share(){
 function cardHTML(name, img, stats, tag, hot){
   const rows = Object.keys(SHORT).map(k => {
     const v = stats[k]; if (!Array.isArray(v)) return "";
-    const cur = num(v[0]), max = Math.max(1, num(v[1]));
     const col = /^#[0-9a-f]{6}$/i.test(v[2]) ? v[2] : "#888888";
+    if (v[1] === null){
+      const names = { resFis:"FIS", resEne:"ENE", resMen:"MEN" };
+      const pt = (Array.isArray(v[3]) ? v[3] : [v[3]]).map(x => names[x]).filter(Boolean).join(" / ");
+      return `<div class="mini"><span>${SHORT[k]}</span><div class="b"><i style="width:100%;background:${col};opacity:.35"></i></div><span>${num(v[0])}</span></div>${pt ? `<div class="mini" style="grid-template-columns:1fr;margin-top:1px"><span>Protege: ${pt}</span></div>` : ""}`;
+    }
+    const cur = num(v[0]), max = Math.max(1, num(v[1]));
     let extra = "";
     if (k === "salud" || k === "saludMen"){
       const p = penalty({ cur: Math.min(cur, max), max });
@@ -308,23 +364,44 @@ function cardHTML(name, img, stats, tag, hot){
   return `<article class="pc${hot ? " hot" : ""}"><div class="th" style="${bg}"></div><div class="info"><h3>${esc(name)}${tag}${hot ? '<span class="rb">Reacción</span>' : ""}</h3>${rows}</div></article>`;
 }
 
-const REACT = "com.advelas.donesowl/reaccion", CH = "com.advelas.donesowl/evento";
-let isGM = false, reacting = false;
+const CH = "com.advelas.donesowl/evento", ROOMK = "com.advelas.donesowl/cola";
+let isGM = false, selfId = "", queue = [], sent = false, sentT = 0, roundArmed = false;
+const inQ = id => queue.some(e => e.id === id);
+const reactionUsed = () => sent || inQ(selfId);
+const send = d => OBR.broadcast.sendMessage(CH, d, { destination:"ALL" });
+
+function normQ(md){
+  const q = md?.[ROOMK]?.q;
+  return Array.isArray(q) ? q.filter(e => e && typeof e.id === "string").map(e => ({ id:e.id, name:String(e.name ?? ""), done:!!e.done })) : [];
+}
+
+function queueHTML(){
+  let h = `<section class="stat" style="--c:#f2c94c"><div class="top"><b>Cola de reacciones</b><span class="val">${queue.length}</span></div>`;
+  if (!queue.length) h += '<div class="empty" style="padding:8px">Nadie ha reaccionado.</div>';
+  queue.forEach((e, i) => {
+    h += `<div class="qi${e.done ? " done" : ""}"><span class="qn">${i + 1}</span><span class="qt">${esc(e.name)}</span>`;
+    if (isGM) h += `<button data-op="resolve" data-id="${esc(e.id)}">${e.done ? "Reabrir" : "Resolver"}</button><button data-op="return" data-id="${esc(e.id)}" title="Devolver la reacción al jugador">Devolver</button>`;
+    else if (e.done) h += '<span class="val">resuelta</span>';
+    h += "</div>";
+  });
+  return h + "</section>";
+}
 
 function renderParty(){
   const box = $("#party"); if (box.hidden) return;
   if (!OBR){ box.innerHTML = '<div class="empty">La party solo está disponible dentro de Owlbear Rodeo.</div>'; return; }
   let html = "";
-  if (isGM) html += '<button data-reset class="newround">Nueva ronda: limpiar reacciones</button>';
-  else {
+  if (isGM) html += `<button data-reset class="newround">${roundArmed ? "¿Seguro? Toca otra vez para confirmar" : "Nueva ronda: limpiar cola y reacciones"}</button>`;
+  html += queueHTML();
+  if (!isGM){
     const own = {};
-    for (const k in state.stats){ const s = state.stats[k]; own[k] = [s.cur, s.max, s.color]; }
-    html += cardHTML(state.name || "Mi personaje", state.img, own, " (tú)", reacting);
+    for (const k in state.stats){ const s = state.stats[k]; own[k] = [s.cur, s.unlimited ? null : s.max, s.color, s.prot]; }
+    html += cardHTML(state.name || "Mi personaje", state.img, own, " (tú)", reactionUsed());
   }
   let n = 0;
   [...players].sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
     const d = p.metadata?.[META];
-    const hot = p.metadata?.[REACT] === true;
+    const hot = inQ(p.id);
     if (d && d.on && d.s){
       n++;
       html += cardHTML(d.name || p.name, d.thumb, d.s, d.name ? ` <small style="color:var(--muted);font-weight:400">${esc(p.name)}</small>` : "", hot);
@@ -336,10 +413,18 @@ function renderParty(){
   if (isGM && !n) html += '<div class="empty">Aún no hay jugadores en la sala.</div>';
   box.innerHTML = html;
 }
+
 $("#party").onclick = e => {
-  if (!e.target.closest("[data-reset]") || !OBR) return;
-  OBR.broadcast.sendMessage(CH, { type:"reset" }, { destination:"ALL" });
-  msg("Reacciones restauradas.");
+  if (!OBR || !isGM) return;
+  const b = e.target.closest("[data-reset],[data-op]"); if (!b) return;
+  if (b.hasAttribute("data-reset")){
+    if (!roundArmed){
+      roundArmed = true; renderParty();
+      setTimeout(() => { roundArmed = false; renderParty(); }, 4000);
+      return;
+    }
+    roundArmed = false; send({ type:"reset" }); renderParty();
+  } else send({ type:"op", op:b.dataset.op, id:b.dataset.id });
 };
 
 function tab(party){
@@ -351,24 +436,31 @@ $("#tabMine").onclick = () => tab(false);
 $("#tabParty").onclick = () => tab(true);
 $("#share").onchange = e => { state.share = e.target.checked; save(); };
 
+/* Reacción: el jugador solo puede activarla; la devuelve el GM */
+function updateReact(){
+  const el = $("#react"), used = reactionUsed();
+  el.checked = used; el.disabled = !OBR || used;
+  const i = queue.findIndex(e => e.id === selfId);
+  $("#react + span").textContent = !used ? "Reacción"
+    : i >= 0 ? `Reacción usada (n.º ${i + 1}${queue[i].done ? ", resuelta" : ""})` : "Reacción usada";
+}
 $("#react").onchange = async e => {
-  if (!OBR) return;
-  reacting = e.target.checked;
-  OBR.player.setMetadata({ [REACT]: reacting });
-  if (reacting){
-    const name = state.name.trim() || await OBR.player.getName();
-    OBR.broadcast.sendMessage(CH, { type:"reaccion", name }, { destination:"ALL" });
-  }
-  renderParty();
+  if (!OBR || reactionUsed() || !e.target.checked){ updateReact(); return; }
+  sent = true; updateReact();
+  clearTimeout(sentT);
+  sentT = setTimeout(() => {
+    if (!inQ(selfId)){ sent = false; updateReact(); msg("No se registró la reacción. ¿Hay un GM conectado?"); }
+  }, 5000);
+  const name = state.name.trim() || await OBR.player.getName();
+  send({ type:"reaccion", id:selfId, name });
 };
 
 /* El GM solo ve la party: sin ficha propia y sin compartir nada */
 function applyRole(role){
-  const gm = role === "GM";
-  isGM = gm;
-  document.querySelector(".tabs").hidden = gm;
-  if (gm && OBR) OBR.player.setMetadata({ [META]: { on:false }, [REACT]: false });
-  tab(gm);
+  isGM = role === "GM";
+  document.querySelector(".tabs").hidden = isGM;
+  if (isGM && OBR) OBR.player.setMetadata({ [META]: { on:false } });
+  tab(isGM);
 }
 
 async function init(){
@@ -379,22 +471,20 @@ async function init(){
     if (sdk.isAvailable){
       OBR = sdk;
       KEY = "ficha-personaje-v1:" + OBR.room.id;
+      selfId = await OBR.player.getId();
       players = await OBR.party.getPlayers();
+      queue = normQ(await OBR.room.getMetadata());
       OBR.party.onChange(ps => { players = ps; renderParty(); });
-      reacting = (await OBR.player.getMetadata())[REACT] === true;
-      let role = await OBR.player.getRole();
-      OBR.player.onChange(p => {
-        reacting = p.metadata?.[REACT] === true;
-        $("#react").checked = reacting;
-        if ((p.role === "GM") !== isGM) applyRole(p.role);
-        renderParty();
+      OBR.room.onMetadataChange(md => {
+        queue = normQ(md);
+        if (inQ(selfId)) sent = false;
+        updateReact(); renderParty();
       });
-      applyRole(role);
+      OBR.player.onChange(p => { if ((p.role === "GM") !== isGM) applyRole(p.role); });
+      applyRole(await OBR.player.getRole());
     }
   } catch(e){ /* fuera de Owlbear: funciona igual, sin party */ }
-  $("#react").disabled = !OBR;
-  $("#react").checked = reacting;
-  load(); build(); share(); renderParty();
+  load(); build(); share(); updateReact(); renderParty();
 }
 init();
 </script>
