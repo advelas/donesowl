@@ -69,6 +69,15 @@ footer button{flex:1}
 .pc.hot{background:#4d4208;outline:2px solid #f2c94c}
 .rb{margin-left:6px;font:700 11px system-ui,sans-serif;padding:1px 7px;border-radius:99px;background:#f2c94c;color:#2a2200;vertical-align:middle}
 .newround{background:#b8912a;color:#1d1700;font-weight:600;padding:9px}
+@media (min-width:620px){ body{padding:14px 18px} }
+.cols{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+@media (min-width:620px){ .cols{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:start} }
+#sheet{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;background:var(--panel);border-radius:10px;padding:12px}
+.sh h4{margin:0 0 4px;font:700 15px Georgia,"Times New Roman",serif;letter-spacing:.05em;text-transform:uppercase;color:#f08a3c}
+.kv{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.kv input{width:48px;text-align:center;background:#14121a;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:3px 2px;font:600 13px system-ui,sans-serif}
+.kv input::-webkit-inner-spin-button,.kv input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.kv input[type=number]{-moz-appearance:textfield;appearance:textfield}
 </style>
 </head>
 <body>
@@ -81,11 +90,16 @@ footer button{flex:1}
 </header>
 <label class="react"><input type="checkbox" id="react"><span>Reacción</span></label>
 
-<main id="stats" style="display:flex;flex-direction:column;gap:8px"></main>
+<div class="cols">
+  <div id="sheet"></div>
+  <main id="stats" style="display:flex;flex-direction:column;gap:8px"></main>
+</div>
 
 <label class="cfg" style="font-size:13px"><input type="checkbox" id="share"> Compartir mi ficha con la party</label>
 <footer>
+  <button id="importSheet">Importar hoja (Excel o CSV)</button>
   <button id="reset">Reiniciar ficha</button>
+  <input id="sheetfile" type="file" accept=".xlsx,.xlsm,.csv" hidden>
 </footer>
 </div>
 <div id="party" class="view" hidden></div>
@@ -96,6 +110,7 @@ const DEFAULT = () => ({
   name: "",
   share: true,
   img: "",
+  data: {},
   stats: {
     resFis:  { label:"Resistencia física",     kind:"res",   max:10, cur:10, color:"#d98a3d" },
     resEne:  { label:"Resistencia energética", kind:"res",   max:10, cur:10, color:"#4aa3df" },
@@ -127,6 +142,10 @@ function merge(data){
   base.name = String(data.name ?? "");
   base.img = typeof data.img === "string" ? data.img : "";
   base.share = data.share !== false;
+  for (const [key] of ALL_FIELDS){
+    const n = Number(data.data?.[key]);
+    if (data.data?.[key] != null && data.data?.[key] !== "" && Number.isFinite(n)) base.data[key] = Math.round(n);
+  }
   for (const k in base.stats){
     const s = data.stats?.[k];
     if (!s) continue;
@@ -149,6 +168,7 @@ function merge(data){
 /* ---------- Interfaz ---------- */
 const refs = {};
 function build(){
+  buildSheet();
   const box = $("#stats"); box.innerHTML = "";
   for (const k in state.stats){
     const s = state.stats[k];
@@ -290,6 +310,95 @@ $("#file").onchange = e => {
   img.onerror = () => msg("No se pudo leer la imagen.");
   img.src = URL.createObjectURL(f);
   e.target.value = "";
+};
+
+/* ---------- Hoja de personaje (estadísticas) ---------- */
+// [clave, etiqueta, nombre en la columna A del Excel (sin tildes, mayúsculas)]
+const SHEET = [
+  ["Características", [["vigor","Vigor","VIGOR"], ["psique","Psique","PSIQUE"], ["don","Don","DON"]]],
+  ["Aptitudes", [["fisica","Física","FISICA"], ["mental","Mental","MENTAL"], ["social","Social","SOCIAL"]]],
+  ["Habilidades", [["atletismo","Atletismo","ATLETISMO"], ["cc","CC","CC"], ["rango","Rango","RANGO"],
+    ["percepcion","Percepción","PERCEPCION"], ["cultura","Cultura","CULTURA"], ["analisis","Análisis","ANALISIS"],
+    ["subterfugio","Subterfugio","SUBTERFUGIO"], ["carisma","Carisma","CARISMA"], ["presencia","Presencia","PRESENCIA"]]],
+  ["Combate", [["iniciativa","Iniciativa","INICIATIVA"], ["mov","Movimiento","MOV"], ["defCC","Defensa CC","DEF CC"],
+    ["defRan","Defensa rango","DEF RAN"], ["defMen","Defensa mental","DEF MEN"]]],
+];
+const ALL_FIELDS = SHEET.flatMap(([, f]) => f);
+// Estos valores del Excel fijan el máximo de cada medidor
+const IMPORT_MAX = { "R.FIS":"resFis", "R.ENE":"resEne", "R.MEN":"resMen", "SALUD":"salud", "SALUD MEN":"saludMen" };
+
+function buildSheet(){
+  const box = $("#sheet"); box.innerHTML = "";
+  for (const [title, fields] of SHEET){
+    const sec = document.createElement("section"); sec.className = "sh";
+    sec.innerHTML = `<h4>${title}</h4>`;
+    for (const [key, label] of fields){
+      const row = document.createElement("label"); row.className = "kv";
+      row.innerHTML = `<span>${label}</span><input type="number" step="1" inputmode="numeric">`;
+      const inp = row.querySelector("input");
+      inp.value = state.data[key] ?? "";
+      inp.oninput = () => {
+        if (inp.value === "") delete state.data[key]; else state.data[key] = Math.round(Number(inp.value));
+        save();
+      };
+      sec.append(row);
+    }
+    box.append(sec);
+  }
+}
+
+const norm = t => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+
+let xlsxP = null;
+function loadXLSX(){
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return xlsxP ??= new Promise((ok, no) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    sc.onload = () => ok(window.XLSX);
+    sc.onerror = () => { xlsxP = null; no(new Error("No se pudo cargar el lector de Excel.")); };
+    document.head.append(sc);
+  });
+}
+
+/* Lee la pestaña "Lista de cálculo": etiqueta en la columna A, valor en la B */
+function parseSheet(XLSX, wb){
+  const name = wb.SheetNames.find(n => norm(n).includes("LISTA")) ?? (wb.SheetNames.length === 1 ? wb.SheetNames[0] : null);
+  if (!name) return null;
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, raw:true, defval:null });
+  const map = {};
+  for (const r of rows){
+    const k = norm(r[0]), v = Number(r[1]);
+    if (k && r[1] !== null && r[1] !== "" && Number.isFinite(v)) map[k] = v;
+  }
+  return map;
+}
+
+function applySheet(map){
+  let n = 0;
+  for (const [key, , label] of ALL_FIELDS) if (label in map){ state.data[key] = Math.round(map[label]); n++; }
+  for (const [label, k] of Object.entries(IMPORT_MAX)) if (label in map){
+    const s = state.stats[k], nm = Math.max(1, Math.round(map[label]));
+    s.cur = Math.min(nm, Math.max(0, s.cur + (nm - s.max))); // conserva el daño ya recibido
+    s.max = nm; n++;
+  }
+  return n;
+}
+
+$("#importSheet").onclick = () => $("#sheetfile").click();
+$("#sheetfile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  e.target.value = "";
+  try {
+    const XLSX = await loadXLSX();
+    const csv = /\.csv$/i.test(f.name);
+    const wb = csv ? XLSX.read(await f.text(), { type:"string" }) : XLSX.read(await f.arrayBuffer(), { type:"array" });
+    const map = parseSheet(XLSX, wb);
+    if (!map){ msg("No encontré la pestaña \"Lista de cálculo\"."); return; }
+    const n = applySheet(map);
+    if (!n){ msg("No reconocí ningún dato en las columnas A y B."); return; }
+    build(); save(); msg(`Hoja importada: ${n} valores.`);
+  } catch(err){ msg("No se pudo leer el archivo: " + err.message); }
 };
 
 /* ---------- Reiniciar (con confirmación en dos toques) ---------- */

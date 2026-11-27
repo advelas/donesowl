@@ -1,6 +1,6 @@
 {
   "name": "Ficha de personaje",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "manifest_version": 1,
   "description": "Controla resistencias y salud de tu personaje.",
   "author": "advelas",
@@ -8,8 +8,8 @@
     "title": "Ficha",
     "icon": "https://advelas.github.io/donesowl/icon.svg",
     "popover": "https://advelas.github.io/donesowl/index.html",
-    "width": 400,
-    "height": 720
+    "width": 780,
+    "height": 760
   },
   "background_url": "https://advelas.github.io/donesowl/background.html"
 }
