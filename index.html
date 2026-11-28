@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ficha de personaje</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#1d1b22; --panel:#27242f; --line:#3a3644; --text:#ece8f2; --muted:#9b95a8;
@@ -78,10 +83,122 @@ footer button{flex:1}
 .kv input{width:48px;text-align:center;background:#14121a;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:3px 2px;font:600 13px system-ui,sans-serif}
 .kv input::-webkit-inner-spin-button,.kv input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .kv input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.tr{grid-column:1/-1;border-top:1px solid var(--line);padding-top:8px;margin-top:4px}
+.tr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+@media (min-width:620px){ .tr-grid{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.tr-box{display:flex;flex-direction:column;gap:3px;background:#14121a;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.tr-box select,.tr-box input{width:100%;background:transparent;border:0;color:var(--text);font:600 13px system-ui,sans-serif;padding:2px 0;text-transform:none;letter-spacing:0}
+.tr-box select option,.tr-box select optgroup{background:var(--panel);color:var(--text)}
+.tr-auto{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0;font-size:12px}
+.tr-auto label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.tr-btns{display:flex;gap:6px;flex-wrap:wrap}
+.tr-btns button{flex:1;min-width:84px;font-size:12px;font-weight:600}
+.tr-btns .go{background:#f08a3c;color:#1d1000;font-size:14px}
+.tr-prev,.tr-last{font-size:11px;color:var(--muted);margin-top:6px;word-break:break-word}
+.tr-last{color:var(--text)}
+.tr-target{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--muted)}
+.tr-target select{background:#14121a;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.kv.pick{cursor:pointer;border-radius:6px;padding:2px 6px;margin:0 -6px;transition:background .12s}
+.kv.pick:hover{background:var(--line)}
+.kv.pick.sel{background:#f08a3c;color:#1d1000;font-weight:700}
+.kv.pick.sel:hover{background:#f39a56}
+.pickbox{cursor:pointer}
+.pickbox:hover{border-color:#f08a3c}
+.tr-box b{font:600 13px system-ui,sans-serif;text-transform:none;letter-spacing:0;color:var(--text);min-height:19px;display:block}
+.tr-box b.empty{color:var(--muted);font-weight:400}
+
+/* ===== Tema "hoja de personaje" (papel, tinta y naranja) ===== */
+:root{
+  --bg:#f3f1ec; --panel:rgba(255,255,255,.78); --line:#161616; --text:#161616; --muted:#5a5a63;
+  --danger:#d63a2a; --orange:#f26a21; --yellow:#ffd23f; --ink:#161616; --blue:#dbe5fb;
+  --f-head:"Bangers","Impact","Arial Narrow",sans-serif;
+  --f-label:"Oswald","Arial Narrow","Segoe UI",sans-serif;
+  color-scheme: light;
+}
+html{min-height:100%;background:#f3f1ec url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20800%20520'%20preserveAspectRatio='xMidYMax%20slice'%3E%3Cdefs%3E%3Cfilter%20id='b'%3E%3CfeGaussianBlur%20stdDeviation='2.5'/%3E%3C/filter%3E%3C/defs%3E%3Cg%20filter='url(%23b)'%3E%3Cpath%20d='M-20%20420%20C120%20395%20230%20335%20305%20250%20C345%20205%20385%20150%20408%20118%20L432%20118%20C455%20150%20495%20205%20535%20250%20C610%20335%20720%20395%20820%20420%20L820%20540%20L-20%20540Z'%20fill='%23a9afb8'%20opacity='.85'/%3E%3Cpath%20d='M392%20136%20L408%20118%20L432%20118%20L448%20136%20L437%20150%20L424%20139%20L413%20152%20L402%20141Z'%20fill='%23fff'%20opacity='.95'/%3E%3Cpath%20d='M-20%20470%20C140%20430%20300%20455%20430%20432%20C570%20408%20700%20450%20820%20428%20L820%20540%20L-20%20540Z'%20fill='%238f959e'%20opacity='.5'/%3E%3Cellipse%20cx='400'%20cy='432'%20rx='430'%20ry='26'%20fill='%23fff'%20opacity='.6'/%3E%3C/g%3E%3C/svg%3E") center bottom/cover no-repeat}
+body{background:transparent;min-height:100vh}
+.topbar{display:flex;align-items:center;gap:12px}
+.topbar .tabs{flex:1}
+.logo{height:44px;width:auto;flex:none;display:block}
+.sheet-title{font:400 20px var(--f-head);color:var(--orange);letter-spacing:.05em;text-shadow:1px 1px 0 rgba(0,0,0,.35);white-space:nowrap}
+@media (max-width:619px){ .sheet-title{display:none} }
+button{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:8px;font:500 13px var(--f-label);letter-spacing:.04em;text-transform:uppercase}
+button:hover{filter:none;background:var(--yellow)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #2b6fff;outline-offset:1px}
+.dmg{background:var(--danger);color:#fff}
+.dmg:hover{background:#e0503f}
+.ok{padding:2px 8px}
+.tabs button{background:#fff;color:var(--ink);font-size:14px}
+.tabs button.on{background:var(--orange);color:var(--ink);font-weight:600}
+.tabs button:hover:not(.on){background:var(--yellow)}
+#avatar{border:2px dashed var(--ink);background:#fff center/cover no-repeat;color:var(--muted)}
+#avatar.has{border-style:solid}
+#name{background:var(--blue);border:0;border-radius:6px;padding:6px 12px;color:var(--ink);font:500 22px var(--f-label);text-transform:uppercase;letter-spacing:.04em}
+#name::placeholder{color:#7d89ad}
+.react{background:#fff;border:2px solid var(--ink);font:500 14px var(--f-label);text-transform:uppercase;letter-spacing:.05em}
+.react:has(input:checked){background:var(--yellow);outline:none}
+.react input{accent-color:var(--orange);width:18px;height:18px}
+#sheet{background:rgba(255,255,255,.7);backdrop-filter:blur(2px);border-radius:12px}
+.sh h4{font:400 24px var(--f-head);color:var(--orange);letter-spacing:.05em;text-shadow:1px 1px 0 rgba(0,0,0,.35);margin:0 0 6px}
+.kv{font:400 13px var(--f-label);letter-spacing:.06em;color:var(--ink)}
+.kv input,.row input[type=number],.row input.amt{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:6px;font:600 14px var(--f-label)}
+.kv input{width:44px;padding:3px 0}
+.row input[type=number],.row input.amt{padding:4px 6px}
+.kv.pick:hover{background:#ffe3c4}
+.kv.pick.sel{background:var(--orange);color:#1a0a00;font-weight:600}
+.kv.pick.sel:hover{background:#f57d3d}
+.stat{background:rgba(255,255,255,.8);border:2px solid var(--ink);border-left:8px solid var(--c);border-radius:10px}
+.stat.group-salud{background:rgba(255,255,255,.8)}
+.top b{font:500 15px var(--f-label);text-transform:uppercase;letter-spacing:.05em}
+.val{color:var(--ink);font:600 14px var(--f-label)}
+.bar{background:#e8e4db;border:2px solid var(--ink);height:18px}
+.tick{background:var(--ink);width:2px}
+.pen{background:#e8e4db;color:var(--ink);border:1px solid var(--ink);font:500 11px var(--f-label);text-transform:uppercase}
+.pen.on{background:var(--danger);color:#fff;border-color:var(--danger)}
+.cfg,.prot{color:var(--muted);font-family:var(--f-label)}
+.prot label{color:var(--ink)}
+.prot input,.tr-auto input{accent-color:var(--orange)}
+input[type=color]{border:2px solid var(--ink);border-radius:6px;width:28px;height:26px;background:#fff}
+.tr{border-top:2px solid rgba(0,0,0,.25)}
+.tr-box{background:#fff;border:2px solid var(--ink);font-family:var(--f-label);color:var(--muted)}
+.tr-box input,.tr-box b{color:var(--ink);font-family:var(--f-label)}
+.tr-box b.empty{color:#8a8a93}
+.pickbox:hover{border-color:var(--orange);background:#fff7ef}
+.tr-btns button{font-size:13px}
+.tr-btns .go{background:var(--orange);color:var(--ink);font-size:16px;font-weight:600}
+.tr-btns .go:hover{background:#f57d3d}
+.tr-prev{color:var(--muted)}
+.tr-last{color:var(--ink);font-weight:500}
+.tr-target{color:var(--muted)}
+.tr-target select{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:6px}
+.pc{background:rgba(255,255,255,.85);border:2px solid var(--ink)}
+.pc h3{font:500 17px var(--f-label);text-transform:uppercase;letter-spacing:.04em}
+.pc .th{background:#e8e4db;border:2px solid var(--ink)}
+.pc.hot{background:#fff1ad;outline:3px solid var(--yellow);outline-offset:0}
+.mini{color:var(--ink);font-family:var(--f-label)}
+.mini .b{background:#e8e4db;border:1px solid var(--ink)}
+.empty{color:var(--muted)}
+.rb{background:var(--yellow);color:var(--ink);border:1px solid var(--ink);font-family:var(--f-label);text-transform:uppercase}
+.qi{border-top:1px solid rgba(0,0,0,.2)}
+.qn{background:var(--yellow);color:var(--ink);border:2px solid var(--ink)}
+.qi.done .qn{background:#e8e4db;color:var(--muted);border-color:var(--muted)}
+.newround{background:var(--yellow);color:var(--ink);font-weight:600}
+.newround:hover{background:#ffe27a}
+#msg{color:var(--ink);font-weight:500}
+.cols{grid-template-columns:minmax(0,1fr)}
+@media (min-width:620px){ .cols{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)} }
+#sheet{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 14px}
+.sh h4{font-size:19px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv{font-size:12px;letter-spacing:.04em;min-width:0}
+.kv span{min-width:0}
+.kv input{width:40px;flex:none}
+.row input.amt{width:78px}
+@media (min-width:620px){ .tr-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.tr-box span{font-size:9px;line-height:1.15}
 </style>
 </head>
 <body>
-<nav class="tabs"><button id="tabMine" class="on">Mi ficha</button><button id="tabParty">Party</button></nav>
+<div class="topbar"><img class="logo" src="logo.png" alt="DONES"><nav class="tabs"><button id="tabMine" class="on">Mi ficha</button><button id="tabParty">Party</button></nav><div class="sheet-title">Hoja de personaje</div></div>
 <div id="mine" class="view">
 <header>
   <div id="avatar" title="Subir imagen" tabindex="0" role="button">Subir imagen</div>
@@ -111,6 +228,7 @@ const DEFAULT = () => ({
   share: true,
   img: "",
   data: {},
+  roll: { base:"", skill:"", bonus:"", pen:"", autoS:true, autoM:true, target:"everyone" },
   stats: {
     resFis:  { label:"Resistencia física",     kind:"res",   max:10, cur:10, color:"#d98a3d" },
     resEne:  { label:"Resistencia energética", kind:"res",   max:10, cur:10, color:"#4aa3df" },
@@ -146,6 +264,14 @@ function merge(data){
     const n = Number(data.data?.[key]);
     if (data.data?.[key] != null && data.data?.[key] !== "" && Number.isFinite(n)) base.data[key] = Math.round(n);
   }
+  const rl = data.roll || {};
+  if (BASES.some(b => b[0] === rl.base)) base.roll.base = rl.base;
+  if (SKILLS.includes(rl.skill)) base.roll.skill = rl.skill;
+  base.roll.bonus = typeof rl.bonus === "string" ? rl.bonus.slice(0, 20) : "";
+  base.roll.pen = typeof rl.pen === "string" ? rl.pen.slice(0, 20) : "";
+  base.roll.autoS = rl.autoS !== false;
+  base.roll.autoM = rl.autoM !== false;
+  if (TARGETS.some(t => t[0] === rl.target)) base.roll.target = rl.target;
   for (const k in base.stats){
     const s = data.stats?.[k];
     if (!s) continue;
@@ -278,6 +404,7 @@ function refresh(k){
     r.pen.textContent = p ? `Penalizador -${p}` : "Sin penalizador";
     r.pen.classList.toggle("on", p > 0);
   }
+  updateRoll();
 }
 function refreshAll(){
   for (const k in state.stats) refresh(k);
@@ -333,18 +460,28 @@ function buildSheet(){
     const sec = document.createElement("section"); sec.className = "sh";
     sec.innerHTML = `<h4>${title}</h4>`;
     for (const [key, label] of fields){
-      const row = document.createElement("label"); row.className = "kv";
+      const row = document.createElement("div"); row.className = "kv";
+      const group = ROLL_GROUP[title];
+      if (group){
+        row.classList.add("pick"); row.dataset.key = key; row.dataset.group = group;
+        row.tabIndex = 0; row.setAttribute("role", "button"); row.title = "Clic para incluir en la tirada";
+        const toggle = () => { state.roll[group] = state.roll[group] === key ? "" : key; save(); updateRoll(); };
+        row.onclick = e => { if (e.target.tagName !== "INPUT") toggle(); };
+        row.onkeydown = e => { if (e.target === row && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); toggle(); } };
+      }
       row.innerHTML = `<span>${label}</span><input type="number" step="1" inputmode="numeric">`;
       const inp = row.querySelector("input");
       inp.value = state.data[key] ?? "";
       inp.oninput = () => {
         if (inp.value === "") delete state.data[key]; else state.data[key] = Math.round(Number(inp.value));
-        save();
+        save(); updateRoll();
       };
       sec.append(row);
     }
     box.append(sec);
   }
+  buildRoll(box);
+  updateRoll();
 }
 
 const norm = t => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
@@ -400,6 +537,141 @@ $("#sheetfile").onchange = async e => {
     build(); save(); msg(`Hoja importada: ${n} valores.`);
   } catch(err){ msg("No se pudo leer el archivo: " + err.message); }
 };
+
+/* ---------- Tirada con Dice+ ---------- */
+const SRC = "com.advelas.donesowl";
+const BASE_DICE = "3d10dl1dh1";
+const ROLL_GROUP = { "Características":"base", "Aptitudes":"base", "Habilidades":"skill" };
+const BASES = [["vigor","Vigor"], ["psique","Psique"], ["don","Don"], ["fisica","Física"], ["mental","Mental"], ["social","Social"]];
+const SKILLS = ["atletismo","cc","rango","percepcion","cultura","analisis","subterfugio","carisma","presencia"];
+const SINGLES = ["psique", "don", "iniciativa"];
+const TARGETS = [["everyone","Todos"], ["self","Solo yo"], ["dm","GM y yo"], ["gm_only","Solo GM"]];
+const LABEL = Object.fromEntries(ALL_FIELDS.map(([k, l]) => [k, l]));
+const pendingRolls = new Set();
+
+/* 3d10dl1dh1 + base + habilidad + bonificadores - penalizadores */
+function buildCommand(single){
+  const R = state.roll, names = [], parts = [BASE_DICE];
+  const add = key => {
+    const v = state.data[key];
+    if (v == null) throw new Error(`Falta el valor de ${LABEL[key]}.`);
+    parts.push((v < 0 ? "-" : "+") + Math.abs(v)); names.push(LABEL[key]);
+  };
+  if (single) add(single);
+  else {
+    if (!R.base || !R.skill) throw new Error("Elige una característica o aptitud y una habilidad.");
+    add(R.base); add(R.skill);
+  }
+  const b = R.bonus.trim() ? parseDelta(R.bonus, "+") : 0;
+  if (b === null) throw new Error("Bonificadores no válidos. Ej.: 2 o 2+1");
+  let pen = R.pen.trim() ? parseDelta(R.pen, "+") : 0;
+  if (pen === null) throw new Error("Penalizadores no válidos. Ej.: 1 o 1+2");
+  pen = Math.abs(pen);
+  if (R.autoS) pen += penalty(state.stats.salud);
+  if (R.autoM) pen += penalty(state.stats.saludMen);
+  if (b) parts.push((b < 0 ? "-" : "+") + Math.abs(b));
+  if (pen) parts.push("-" + pen);
+  return parts.join("") + " #" + names.join(" y ");
+}
+
+function buildRoll(box){
+  const sec = document.createElement("section"); sec.className = "sh tr";
+  sec.innerHTML = `
+    <h4>Tirada</h4>
+    <div class="tr-grid">
+      <div class="tr-box pickbox" data-b="base" title="Clic para quitar"><span>Característica / Aptitud</span><b></b></div>
+      <div class="tr-box pickbox" data-b="skill" title="Clic para quitar"><span>Habilidad</span><b></b></div>
+      <label class="tr-box"><span>Bonificadores</span><input data-f="bonus" type="text" autocomplete="off" placeholder="+2"></label>
+      <label class="tr-box"><span>Penalizadores</span><input data-f="pen" type="text" autocomplete="off" placeholder="1"></label>
+    </div>
+    <div class="tr-auto">
+      <label><input type="checkbox" data-f="autoS"><span data-l="s"></span></label>
+      <label><input type="checkbox" data-f="autoM"><span data-l="m"></span></label>
+    </div>
+    <div class="tr-btns">
+      <button class="go" data-go>Tirar</button>
+      ${SINGLES.map(k => `<button data-single="${k}"></button>`).join("")}
+    </div>
+    <div class="tr-prev"></div>
+    <div class="tr-last"></div>
+    <label class="tr-target">Visible para <select data-f="target">${TARGETS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>`;
+  sec.querySelectorAll("[data-f]").forEach(el => {
+    const f = el.dataset.f;
+    el.addEventListener(el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input", () => {
+      state.roll[f] = el.type === "checkbox" ? el.checked : el.value;
+      save(); updateRoll();
+    });
+  });
+  sec.querySelectorAll("[data-b]").forEach(b => { b.onclick = () => { state.roll[b.dataset.b] = ""; save(); updateRoll(); }; });
+  sec.querySelector("[data-go]").onclick = () => rollDice();
+  sec.querySelectorAll("[data-single]").forEach(b => { b.onclick = () => rollDice(b.dataset.single); });
+  box.append(sec);
+}
+
+function updateRoll(){
+  const sec = document.querySelector("#sheet .tr"); if (!sec) return;
+  const R = state.roll, val = k => state.data[k] ?? "–";
+  const q = f => sec.querySelector(`[data-f="${f}"]`);
+  for (const g of ["base", "skill"]){
+    const b = sec.querySelector(`[data-b="${g}"] b`), k = R[g];
+    b.textContent = k ? `${LABEL[k]} (${val(k)})` : "Elige en la lista";
+    b.classList.toggle("empty", !k);
+  }
+  document.querySelectorAll("#sheet .kv.pick").forEach(r => {
+    const on = R[r.dataset.group] === r.dataset.key;
+    r.classList.toggle("sel", on); r.setAttribute("aria-pressed", on);
+  });
+  for (const f of ["bonus", "pen"]) if (document.activeElement !== q(f)) q(f).value = R[f];
+  q("autoS").checked = R.autoS; q("autoM").checked = R.autoM; q("target").value = R.target;
+  const sp = penalty(state.stats.salud), mp = penalty(state.stats.saludMen);
+  sec.querySelector('[data-l="s"]').textContent = "Salud: " + (sp ? "-" + sp : "sin penalizador");
+  sec.querySelector('[data-l="m"]').textContent = "Salud mental: " + (mp ? "-" + mp : "sin penalizador");
+  sec.querySelectorAll("[data-single]").forEach(b => { b.textContent = LABEL[b.dataset.single].toUpperCase() + " " + val(b.dataset.single); });
+  try { sec.querySelector(".tr-prev").textContent = "Comando: " + buildCommand(); }
+  catch(e){ sec.querySelector(".tr-prev").textContent = e.message; }
+}
+
+function checkDicePlus(){
+  const requestId = crypto.randomUUID();
+  return new Promise(resolve => {
+    const off = OBR.broadcast.onMessage("dice-plus/isReady", ev => {
+      if (ev.data && "ready" in ev.data && ev.data.requestId === requestId){ off(); resolve(true); }
+    });
+    OBR.broadcast.sendMessage("dice-plus/isReady", { requestId, timestamp: Date.now() }, { destination:"ALL" });
+    setTimeout(() => { off(); resolve(false); }, 1000);
+  });
+}
+
+async function rollDice(single){
+  if (!OBR){ msg("Las tiradas solo funcionan dentro de Owlbear Rodeo."); return; }
+  let cmd;
+  try { cmd = buildCommand(single); } catch(e){ msg(e.message); return; }
+  if (!(await checkDicePlus())){ msg("No encuentro Dice+. Instálalo en la sala para poder tirar."); return; }
+  const rollId = "roll_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+  pendingRolls.add(rollId);
+  document.querySelector("#sheet .tr-last").textContent = "Tirando… " + cmd;
+  OBR.broadcast.sendMessage("dice-plus/roll-request", {
+    rollId, playerId: selfId, playerName: await OBR.player.getName(),
+    rollTarget: state.roll.target, diceNotation: cmd, showResults: true,
+    timestamp: Date.now(), source: SRC
+  }, { destination:"ALL" });
+}
+
+function registerDiceListeners(){
+  OBR.broadcast.onMessage(`${SRC}/roll-result`, ev => {
+    const d = ev.data;
+    if (!d || !pendingRolls.has(d.rollId)) return;
+    pendingRolls.delete(d.rollId);
+    const el = document.querySelector("#sheet .tr-last");
+    if (el) el.textContent = `Total ${d.result?.totalValue}: ${d.result?.rollSummary ?? ""}`;
+  });
+  OBR.broadcast.onMessage(`${SRC}/roll-error`, ev => {
+    const d = ev.data;
+    if (!d || !pendingRolls.has(d.rollId)) return;
+    pendingRolls.delete(d.rollId);
+    msg("Dice+ no pudo hacer la tirada: " + d.error);
+  });
+}
 
 /* ---------- Reiniciar (con confirmación en dos toques) ---------- */
 const resetBtn = $("#reset");
@@ -581,6 +853,7 @@ async function init(){
       OBR = sdk;
       KEY = "ficha-personaje-v1:" + OBR.room.id;
       selfId = await OBR.player.getId();
+      registerDiceListeners();
       players = await OBR.party.getPlayers();
       queue = normQ(await OBR.room.getMetadata());
       OBR.party.onChange(ps => { players = ps; renderParty(); });
